@@ -1,3 +1,3 @@
-module akhuntsaria/server
+module akhuntsaria/h2c
 
 go 1.22.0

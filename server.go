@@ -7,11 +7,20 @@ import (
 	"strings"
 )
 
+type respGen func() string
+
+var paths = make(map[string]respGen)
+
+func Get(path string, fn respGen) {
+	paths[path] = fn
+}
+
 func handleConn(conn net.Conn) {
 	defer conn.Close()
 	fmt.Println("Accepted connection from", conn.RemoteAddr())
 
 	buff := make([]byte, 1024)
+	http2 := false
 	for {
 		n, err := conn.Read(buff)
 		if err != nil {
@@ -26,25 +35,31 @@ func handleConn(conn net.Conn) {
 
 		responded := false
 
-		lines := strings.Split(strings.TrimSpace(msg), "\n")
-		if len(lines) != 0 {
-			firstLine := strings.TrimSpace(lines[0])
-			if firstLine == "GET /ping HTTP/1.1" {
-				response := "pong"
-				msg = fmt.Sprintf("HTTP/1.1 200 OK\nContent-Length: %d\n\n%s", len(response), response)
+		if !http2 {
+			lines := strings.Split(strings.TrimSpace(msg), "\n")
+			if len(lines) != 0 {
+				firstLine := strings.TrimSpace(lines[0])
+				parts := strings.Split(firstLine, " ")
+				path := parts[1]
+				if fn, ok := paths[path]; ok {
+					response := fn()
+					msg = fmt.Sprintf("HTTP/1.1 200 OK\nContent-Length: %d\n\n%s", len(response), response)
 
-				if !writeConn(conn, msg) {
-					break
-				} else {
-					responded = true
+					if !writeConn(conn, msg) {
+						break
+					} else {
+						responded = true
+					}
 				}
 			}
 		}
 
 		if !responded {
-			msg = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n"
-			if !writeConn(conn, msg) {
-				break
+			if !http2 {
+				msg = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n"
+				if !writeConn(conn, msg) {
+					break
+				}
 			}
 		}
 	}
@@ -64,8 +79,8 @@ func writeConn(conn net.Conn, msg string) bool {
 	return true
 }
 
-func main() {
-	listener, err := net.Listen("tcp", ":80")
+func Start() {
+	listener, err := net.Listen("tcp", "localhost:80")
 	if err != nil {
 		fmt.Println("Error listening on port 80:", err.Error())
 		os.Exit(1)
