@@ -1,3 +1,23 @@
+### What is this?
+A web server and an implementation of the HTTP/2 over TCP protocol written in Go.
+
+### Getting started
+Define endpoints in `main.go` and start the server:
+```sh
+cd h2c
+go run .
+```
+
+To execute a single request:
+```sh
+curl --http2 http://localhost:80/ping
+```
+
+To execute multiple requests in the same session:
+```sh
+curl --http2 --config urls.txt
+```
+
 ### Frames
 Example of a HTTP/2 SETTINGS frame coming from a client:\
 50 52 49 20 2a 20 48 54 54 50 2f 32 2e 30 0d 0a 0d 0a 53 4d 0d 0a 0d 0a - "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n", connection preface\

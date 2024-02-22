@@ -10,7 +10,6 @@ import (
 	"golang.org/x/net/http2/hpack"
 )
 
-// HTTP/2 frame
 type Frame struct {
 	frameType, flags byte
 	streamId         int
