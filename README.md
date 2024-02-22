@@ -1,5 +1,5 @@
 ### What is this?
-A web server and an implementation of the HTTP/2 over TCP protocol written in Go.
+A web server and an implementation of the HTTP/2 over TCP protocol, written in Go.
 
 ### Getting started
 Define endpoints in `main.go` and start the server:
