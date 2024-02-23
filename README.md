@@ -25,7 +25,7 @@ Example of a HTTP/2 SETTINGS frame coming from a client:\
 04 - frame type; SETTINGS\
 00 - frame flags; none\
 00 00 00 00 - stream identifier; for the whole connection in this case\
-00 03 00 00 00 64 | 00 04 00 a0 00 00 | 00 02 00 00 00 00 - payload; 3 settings, 2 bytes for setting id, 4 for a value\
+00 03 00 00 00 64 | 00 04 00 a0 00 00 | 00 02 00 00 00 00 - payload; 3 settings, 2 bytes for setting id, 4 for a value
 
 Actual settings:\
 SETTINGS_MAX_CONCURRENT_STREAMS (0x3) = 0x64 = 100\
