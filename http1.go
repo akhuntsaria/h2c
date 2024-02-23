@@ -7,26 +7,32 @@ import (
 	"strings"
 )
 
-type Request struct {
+type Req struct {
 	method, path string
 	headers      map[string]string
+	body         string
 }
 
-var SWITCH_PROTOCOL_RESPONSE = []byte("HTTP/1.1 101 Switching Protocols\r\nUpgrade: h2c\r\nConnection: Upgrade\r\n\r\n")
+var (
+	HEADERS_SEPARATOR = "\r\n\r\n"
 
-func bytesToRequest(reqBytes []byte) *Request {
+	SWITCH_PROTOCOL_RESPONSE = []byte("HTTP/1.1 101 Switching Protocols\r\nUpgrade: h2c\r\nConnection: Upgrade\r\n\r\n")
+)
+
+func bytesToRequest(reqBytes []byte) *Req {
 	reqStr := string(reqBytes)
-	request := Request{}
+	request := Req{}
 
-	// Leave only headers
-	reqStr = reqStr[:strings.Index(reqStr, "\r\n\r\n")]
+	sepIdx := strings.Index(reqStr, HEADERS_SEPARATOR)
+	headersStr := reqStr[:sepIdx]
 
-	lines := strings.Split(strings.TrimSpace(reqStr), "\r\n")
+	lines := strings.Split(strings.TrimSpace(headersStr), "\r\n")
 	firstLineParts := strings.Split(lines[0], " ")
 
 	request.method = firstLineParts[0]
 	request.path = firstLineParts[1]
 	request.headers = make(map[string]string)
+	request.body = reqStr[sepIdx+len(HEADERS_SEPARATOR):]
 
 	for i := 1; i < len(lines); i++ {
 		headerParts := strings.Split(lines[i], ": ")
@@ -35,7 +41,7 @@ func bytesToRequest(reqBytes []byte) *Request {
 	return &request
 }
 
-func handleHttp1(conn net.Conn, buff []byte) (*Request, error) {
+func handleHttp1(conn net.Conn, buff []byte) (*Req, error) {
 	req := bytesToRequest(buff)
 	fmt.Printf("HTTP/1 request received from %s: %s\n", conn.RemoteAddr(), req)
 
@@ -52,6 +58,6 @@ func handleHttp1(conn net.Conn, buff []byte) (*Request, error) {
 	return req, nil
 }
 
-func upgradeRequested(req *Request) bool {
+func upgradeRequested(req *Req) bool {
 	return req.headers["Upgrade"] == "h2c"
 }

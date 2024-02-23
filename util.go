@@ -23,16 +23,6 @@ func bytesToDec(bin []byte) int {
 	return dec
 }
 
-func contains(haystack []string, needle string) bool {
-	for _, str := range haystack {
-		if str == needle {
-			return true
-		}
-	}
-
-	return false
-}
-
 // 65281, 2 -> [0xff, 0x01]
 func decToBytes(dec int, len int) []byte {
 	bytes := make([]byte, len)

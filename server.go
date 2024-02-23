@@ -6,12 +6,24 @@ import (
 	"os"
 )
 
-type RespGen func() string
+type RespGen func(*Req) string
 
-var paths = make(map[string]RespGen)
+// Path -> method -> generator
+var paths = make(map[string]map[string]RespGen)
 
 func Get(path string, fn RespGen) {
-	paths[path] = fn
+	addRequest("GET", path, fn)
+}
+
+func Post(path string, fn RespGen) {
+	addRequest("POST", path, fn)
+}
+
+func addRequest(method string, path string, fn RespGen) {
+	if _, ok := paths[path]; !ok {
+		paths[path] = make(map[string]RespGen)
+	}
+	paths[path][method] = fn
 }
 
 func handleConn(conn net.Conn) {
@@ -21,7 +33,7 @@ func handleConn(conn net.Conn) {
 	buff := make([]byte, 1024)
 
 	// Request before switching protocols
-	var http1Req *Request
+	var http1Req *Req
 
 	for {
 		n, err := conn.Read(buff)

@@ -80,13 +80,13 @@ func frameToBytes(frame Frame) []byte {
 	return bytes
 }
 
-func handleHttp2(conn net.Conn, buff []byte, http1Req *Request) error {
+func handleHttp2(conn net.Conn, buff []byte, http1Req *Req) error {
 	reqFrames, err := bytesToFrames(buff)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("HTTP/2 frames recieved from %s: %s\n", conn.RemoteAddr(), fmt.Sprint(reqFrames))
+	fmt.Printf("HTTP/2 frames received from %s: %s\n", conn.RemoteAddr(), fmt.Sprint(reqFrames))
 
 	msg := []byte{}
 	for _, reqFrame := range reqFrames {
@@ -99,35 +99,48 @@ func handleHttp2(conn net.Conn, buff []byte, http1Req *Request) error {
 				return err
 			}
 
-			msg = append(msg, getHeadersAndData(conn, &http1Req.path, 1)...)
+			msg = append(msg, getHeadersAndData(conn, http1Req, 1)...)
 			http1Req = nil
-
-		} else if reqFrame.frameType == FRAME_TYPE_HEADERS {
-			// Process a new request
-			path := getPath(reqFrame)
-			if path != nil {
-				msg = append(msg, getHeadersAndData(conn, path, reqFrame.streamId)...)
-			}
 
 		} else if reqFrame.frameType == FRAME_TYPE_SETTINGS || reqFrame.frameType == FRAME_TYPE_WINDOW_UPDATE {
 			// Nothing to process, just mirror the settings
 			msg = append(msg, frameToBytes(reqFrame)...)
+
+		} else if reqFrame.frameType == FRAME_TYPE_HEADERS {
+			req := frameToReq(reqFrame)
+			if req != nil {
+				if req.method == "POST" {
+					addStreamReq(conn, reqFrame.streamId, req)
+					// Wait for the data frame
+					continue
+				}
+				msg = append(msg, getHeadersAndData(conn, req, reqFrame.streamId)...)
+			}
+
+		} else if reqFrame.frameType == FRAME_TYPE_DATA {
+			req := getStreamReq(conn, reqFrame.streamId)
+			if req != nil {
+				req.body = string(reqFrame.payload)
+				msg = append(msg, getHeadersAndData(conn, req, reqFrame.streamId)...)
+				delStreamReq(conn, reqFrame.streamId)
+			}
 		}
 	}
 
 	return writeConn(conn, msg)
 }
 
-func getHeadersAndData(conn net.Conn, path *string, streamId int) []byte {
-	fmt.Println("Sending HTTP/2 headers and data to", conn.RemoteAddr())
+func getHeadersAndData(conn net.Conn, req *Req, streamId int) []byte {
+	fmt.Printf("Generating HTTP/2 headers and data for socket %s and stream %d\n", conn.RemoteAddr(), streamId)
 
 	msg := []byte{}
-	notFound := false
+	notFound := true
 
-	if fn, ok := paths[*path]; ok {
-		msg = []byte(fn())
-	} else {
-		notFound = true
+	if endpoint, ok := paths[req.path]; ok {
+		if fn, ok := endpoint[req.method]; ok {
+			notFound = false
+			msg = []byte(fn(req))
+		}
 	}
 
 	var headersBuff bytes.Buffer
@@ -159,18 +172,24 @@ func getHeadersAndData(conn net.Conn, path *string, streamId int) []byte {
 	return append(frameToBytes(headers), frameToBytes(data)...)
 }
 
-func getPath(frame Frame) *string {
+func frameToReq(frame Frame) *Req {
 	headers, err := decoder.DecodeFull(frame.payload)
 	if err != nil {
 		fmt.Printf("Error decoding frame %s: %s\n", fmt.Sprint(frame), err.Error())
 		return nil
 	}
 
+	req := Req{}
+	req.headers = make(map[string]string)
 	for _, header := range headers {
 		if header.Name == ":path" {
-			return &header.Value
+			req.path = header.Value
+		} else if header.Name == ":method" {
+			req.method = header.Value
+		} else {
+			req.headers[header.Name] = header.Value
 		}
 	}
 
-	return nil
+	return &req
 }

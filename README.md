@@ -15,7 +15,7 @@ curl --http2 http://localhost:80/ping
 
 To execute multiple requests in the same session:
 ```sh
-curl --http2 --config urls.txt
+curl --http2 -X POST http://localhost:80/echo -d "It " -: -X POST http://localhost:80/echo -d "works."
 ```
 
 ### Frames
